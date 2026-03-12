@@ -373,3 +373,51 @@ body{
   .grid3{ grid-template-columns: 1fr; }
   .topnav{ display:none; }
 }
+
+/* Login page helpers (theme-matching) */
+.login-actions{
+  display:flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.divider{
+  position: relative;
+  margin: 18px 0;
+  text-align:center;
+}
+.divider::before{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  top:50%;
+  height:1px;
+  background: var(--border);
+}
+.divider span{
+  position: relative;
+  display:inline-block;
+  padding: 0 10px;
+  background: rgba(255,255,255,0.85);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.login-form{
+  display:grid;
+  gap: 12px;
+}
+
+.login-label{
+  display:grid;
+  gap: 6px;
+}
+
+.login-input{
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.8);
+}
