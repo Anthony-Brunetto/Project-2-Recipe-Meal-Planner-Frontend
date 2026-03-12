@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import LoginPage from './LoginPage'
 import { supabase } from './lib/supabaseClient'
 
 function App() {
@@ -6,6 +7,16 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [recipes, setRecipes] = useState([])
   const [error, setError] = useState('')
+
+  const [route, setRoute] = useState(() => (window.location.hash === '#/login' ? 'login' : 'home'))
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setRoute(window.location.hash === '#/login' ? 'login' : 'home')
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
 
   const featured = useMemo(
     () => [
@@ -54,6 +65,10 @@ function App() {
     }
   }
 
+  if (route === 'login') {
+    return <LoginPage />
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -72,7 +87,7 @@ function App() {
         </nav>
 
         <div className="auth">
-          <button className="btn btn-ghost" type="button" onClick={() => alert('Login page (next)')}>
+          <button className="btn btn-ghost" type="button" onClick={() => (window.location.hash = '#/login')}>
             Log in
           </button>
           <button className="btn btn-primary" type="button" onClick={() => alert('Sign up page (next)')}>
