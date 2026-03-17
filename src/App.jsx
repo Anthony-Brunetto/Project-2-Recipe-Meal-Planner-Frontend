@@ -3,7 +3,7 @@ import LoginPage from './LoginPage'
 import { supabase } from './lib/supabaseClient'
 
 function getApiBaseUrl() {
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+  return import.meta.env.VITE_API_BASE_URL || 'https://recipe-backend-production-2e13.up.railway.app/'
 }
 
 function sampleRandomItems(items, count) {
