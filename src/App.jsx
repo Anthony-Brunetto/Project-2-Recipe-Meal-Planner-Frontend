@@ -2,11 +2,41 @@ import { useEffect, useMemo, useState } from 'react'
 import LoginPage from './LoginPage'
 import { supabase } from './lib/supabaseClient'
 
+function getApiBaseUrl() {
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+}
+
+function sampleRandomItems(items, count) {
+  const copied = [...items]
+  for (let i = copied.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copied[i], copied[j]] = [copied[j], copied[i]]
+  }
+  return copied.slice(0, count)
+}
+
+function normalizeFeaturedRecipe(recipe, index) {
+  const id = recipe.id ?? recipe.recipe_id ?? `featured-${index}`
+  const title = recipe.name ?? recipe.title ?? `Recipe ${index + 1}`
+  const rawTime =
+    recipe.cookTimeMinutes ??
+    recipe.cook_time_minutes ??
+    recipe.totalTimeMinutes ??
+    recipe.time
+  const time = typeof rawTime === 'number' ? `${rawTime} min` : rawTime || 'New'
+  const tag = recipe.category ?? recipe.cuisine ?? recipe.difficulty ?? 'Featured'
+
+  return { id, title, time, tag }
+}
+
 function App() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [recipes, setRecipes] = useState([])
   const [error, setError] = useState('')
+  const [featured, setFeatured] = useState([])
+  const [featuredLoading, setFeaturedLoading] = useState(true)
+  const [featuredError, setFeaturedError] = useState('')
 
   const [route, setRoute] = useState(() => (window.location.hash === '#/login' ? 'login' : 'home'))
 
@@ -18,16 +48,50 @@ function App() {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  const featured = useMemo(
-    () => [
-      { id: 1, title: 'Lemon Garlic Chicken', time: '25 min', tag: 'High Protein' },
-      { id: 2, title: 'Creamy Tomato Pasta', time: '20 min', tag: 'Comfort' },
-      { id: 3, title: 'Veggie Burrito Bowl', time: '30 min', tag: 'Meal Prep' },
-      { id: 4, title: 'Honey Soy Salmon', time: '18 min', tag: 'Weeknight' },
-      { id: 5, title: 'Greek Salad Wraps', time: '12 min', tag: 'Fresh' },
-    ],
-    []
-  )
+  useEffect(() => {
+    let cancelled = false
+
+    const loadFeatured = async () => {
+      setFeaturedError('')
+      setFeaturedLoading(true)
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/api/recipes`)
+        if (!response.ok) {
+          throw new Error(`Failed to load featured recipes (${response.status})`)
+        }
+
+        const payload = await response.json()
+        const list = Array.isArray(payload) ? payload : payload?.content
+        if (!Array.isArray(list)) {
+          throw new Error('Recipes response did not return a list.')
+        }
+
+        const picked = sampleRandomItems(list, 6).map((recipe, index) =>
+          normalizeFeaturedRecipe(recipe, index)
+        )
+
+        if (!cancelled) {
+          setFeatured(picked)
+        }
+      } catch (err) {
+        console.error(err)
+        if (!cancelled) {
+          setFeatured([])
+          setFeaturedError('Could not load featured recipes from backend yet.')
+        }
+      } finally {
+        if (!cancelled) {
+          setFeaturedLoading(false)
+        }
+      }
+    }
+
+    loadFeatured()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const quickFilters = useMemo(
     () => ['Popular', 'Under 30 min', 'Vegetarian', 'High Protein', 'Budget', 'Meal Prep'],
@@ -210,8 +274,11 @@ function App() {
         <section className="section">
           <div className="section-head">
             <h2 className="section-title">Featured recipes</h2>
-            <p className="section-sub">Will be tied into Supabase soon.</p>
+            <p className="section-sub">Loaded from the backend recipes API.</p>
           </div>
+
+          {featuredLoading && <p className="muted">Loading featured recipes...</p>}
+          {featuredError && <div className="banner banner-warn">{featuredError}</div>}
 
           <div className="carousel">
             {featured.map((r) => (

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 function getApiBaseUrl() {
   // Backend OAuth base URL (optional)
   // Example: VITE_API_BASE_URL=http://localhost:8080
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+  return import.meta.env.VITE_API_BASE_URL || 'https://recipe-backend-production-2e13.up.railway.app'
 }
 
 export default function LoginPage() {
