@@ -1,36 +1,22 @@
-// src/LoginPage.jsx
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
-function getApiBaseUrl() {
-  // Backend OAuth base URL (optional)
-  // Example: VITE_API_BASE_URL=http://localhost:8080
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
-}
-
-export default function LoginPage() {
+export default function SignupPage() {
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-
-  const apiBase = useMemo(() => getApiBaseUrl(), [])
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   const goHome = () => {
     window.location.hash = '#/'
   }
 
-  const goSignup = () => {
-    window.location.hash = '#/signup'
-  }
-
-  const startOAuth = (provider) => {
-    // Backend should implement:
-    // /oauth2/authorization/google
-    // /oauth2/authorization/github
-    window.location.href = `${apiBase}/oauth2/authorization/${provider}`
+  const goLogin = () => {
+    window.location.hash = '#/login'
   }
 
   const onSubmit = (e) => {
     e.preventDefault()
-    alert('UI shell only: implement auth/OAuth in backend next.')
+    alert('UI shell only: implement signup/auth later.')
   }
 
   return (
@@ -66,25 +52,24 @@ export default function LoginPage() {
       <main className="page">
         <section className="hero">
           <div className="hero-card">
-            <h1 className="hero-title">Log in</h1>
+            <h1 className="hero-title">Create your account</h1>
             <p className="hero-copy">
-              This page is a UI shell so someone can implement OAuth in the backend next.
+              Build your recipe collection, save favorites, and start planning meals for the week.
             </p>
 
-            <div className="login-actions">
-              <button className="btn btn-primary" type="button" onClick={() => startOAuth('google')}>
-                Continue with Google
-              </button>
-              <button className="btn btn-outline" type="button" onClick={() => startOAuth('github')}>
-                Continue with GitHub
-              </button>
-            </div>
-
-            <div className="divider">
-              <span>or</span>
-            </div>
-
             <form className="login-form" onSubmit={onSubmit}>
+              <label className="login-label">
+                <span className="muted">Full name</span>
+                <input
+                  className="search-input login-input"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your name"
+                  type="text"
+                  autoComplete="name"
+                />
+              </label>
+
               <label className="login-label">
                 <span className="muted">Email</span>
                 <input
@@ -103,25 +88,37 @@ export default function LoginPage() {
                   className="search-input login-input"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Create a password"
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete="new-password"
+                />
+              </label>
+
+              <label className="login-label">
+                <span className="muted">Confirm password</span>
+                <input
+                  className="search-input login-input"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter your password"
+                  type="password"
+                  autoComplete="new-password"
                 />
               </label>
 
               <button className="btn btn-primary" type="submit">
-                Log in (stub)
+                Create account
               </button>
 
               <div className="muted" style={{ fontSize: 13 }}>
-                Don&apos;t have an account?{' '}
-                <button type="button" className="link-button" onClick={goSignup}>
-                  Sign up
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={goLogin}
+                >
+                  Log in
                 </button>
-              </div>
-
-              <div className="muted" style={{ fontSize: 13 }}>
-                Backend note: wire OAuth providers to <code>/oauth2/authorization/&lt;provider&gt;</code> and redirect back to the frontend.
               </div>
             </form>
           </div>
@@ -134,16 +131,24 @@ export default function LoginPage() {
                 <div className="dot" />
               </div>
               <div className="phone-body">
-                <div className="mini-title">After login</div>
+                <div className="mini-title">With an account you can</div>
+
                 <div className="mini-card">
                   <div className="mini-card-title">Save recipes</div>
-                  <div className="mini-card-meta">Favorites • Collections</div>
+                  <div className="mini-card-meta">Keep favorites in one place</div>
                 </div>
+
                 <div className="mini-card">
-                  <div className="mini-card-title">Build meal plans</div>
-                  <div className="mini-card-meta">Drag recipes into your week</div>
+                  <div className="mini-card-title">Create meal plans</div>
+                  <div className="mini-card-meta">Organize meals by day</div>
                 </div>
-                <div className="mini-hint">OAuth backend implementation next</div>
+
+                <div className="mini-card">
+                  <div className="mini-card-title">Build collections</div>
+                  <div className="mini-card-meta">Breakfast • Lunch • Dinner</div>
+                </div>
+
+                <div className="mini-hint">Auth wiring can be added next</div>
               </div>
             </div>
           </div>
