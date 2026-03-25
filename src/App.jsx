@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import LoginPage from './LoginPage'
+import SignupPage from './SignupPage'
 import { supabase } from './lib/supabaseClient'
 
 function getApiBaseUrl() {
@@ -38,12 +39,23 @@ function App() {
   const [featuredLoading, setFeaturedLoading] = useState(true)
   const [featuredError, setFeaturedError] = useState('')
 
-  const [route, setRoute] = useState(() => (window.location.hash === '#/login' ? 'login' : 'home'))
+  const [route, setRoute] = useState(() => {
+    if (window.location.hash === '#/login') return 'login'
+    if (window.location.hash === '#/signup') return 'signup'
+    return 'home'
+  })
 
   useEffect(() => {
     const onHashChange = () => {
-      setRoute(window.location.hash === '#/login' ? 'login' : 'home')
+      if (window.location.hash === '#/login') {
+        setRoute('login')
+      } else if (window.location.hash === '#/signup') {
+        setRoute('signup')
+      } else {
+        setRoute('home')
+      }
     }
+
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
@@ -133,6 +145,10 @@ function App() {
     return <LoginPage />
   }
 
+  if (route === 'signup') {
+    return <SignupPage />
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -154,7 +170,7 @@ function App() {
           <button className="btn btn-ghost" type="button" onClick={() => (window.location.hash = '#/login')}>
             Log in
           </button>
-          <button className="btn btn-primary" type="button" onClick={() => alert('Sign up page (next)')}>
+          <button className="btn btn-primary" type="button" onClick={() => (window.location.hash = '#/signup')}>
             Sign up
           </button>
         </div>
