@@ -29,7 +29,7 @@ export default function LoginPage() {
                         🍳
                     </div>
                     <div className="brand-text">
-                        <div className="brand-name">Recipe Meal Planner</div>
+                        <div className="brand-name">MealMap</div>
                         <div className="brand-sub">
                             Find recipes • Save favorites • Plan your week
                         </div>
