@@ -143,7 +143,7 @@ function App() {
         try {
             // Match your schema: recipe_id, user_id, name, description, instructions
             const { data, error } = await supabase
-                .from("Recipes")
+                .from("recipe")
                 .select("recipe_id, user_id, name, description, instructions")
                 .limit(20);
 
