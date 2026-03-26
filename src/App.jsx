@@ -6,12 +6,6 @@ import { useAuth } from "./AuthContext";
 import { supabase } from "./lib/supabaseClient";
 import { apiFetch } from "./api";
 
-function getRouteFromHash(hash) {
-    if (hash === "#/login") return "login";
-    if (hash === "#/ingredients") return "ingredients";
-    return "home";
-}
-
 function sampleRandomItems(items, count) {
     const copied = [...items];
     for (let i = copied.length - 1; i > 0; i -= 1) {
@@ -64,13 +58,16 @@ function shouldShowRecipeDetail(key) {
     ].includes(normalized);
 }
 
-function getRouteFromHash() {
-    const hashPath = window.location.hash.split("?")[0];
+function getRouteFromHash(hashValue = window.location.hash) {
+    const hashPath = hashValue.split("?")[0];
     if (hashPath === "#/login") {
         return "login";
     }
     if (hashPath === "#/recipes") {
         return "recipes";
+    }
+    if (hashPath === "#/ingredients") {
+        return "ingredients";
     }
     if (hashPath === "#/meal-plans") {
         return "meal-plans";
@@ -115,6 +112,13 @@ function TopBar({ route, session, onLogout }) {
                     onClick={() => (window.location.hash = "#/recipes")}
                 >
                     Recipes
+                </button>
+                <button
+                    className={`nav-link ${route === "ingredients" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => (window.location.hash = "#/ingredients")}
+                >
+                    Ingredients
                 </button>
                 <button
                     className={`nav-link ${route === "meal-plans" ? "active" : ""}`}
@@ -366,87 +370,14 @@ function App() {
             <div className="app-shell">
                 <TopBar route={route} session={session} onLogout={handleLogout} />
                 <MealPlansPage session={session} />
+            </div>
+        );
+    }
+
     if (route === "ingredients") {
         return (
             <div className="app-shell">
-                <header className="topbar">
-                    <div className="brand">
-                        <div className="brand-mark" aria-hidden="true">
-                            ðŸ³
-                        </div>
-                        <div className="brand-text">
-                            <div className="brand-name">Recipe Meal Planner</div>
-                            <div className="brand-sub">
-                                Find recipes â€¢ Save favorites â€¢ Plan your week
-                            </div>
-                        </div>
-                    </div>
-
-                    <nav className="topnav">
-                        <button
-                            className="nav-link"
-                            type="button"
-                            onClick={() => (window.location.hash = "#/")}
-                        >
-                            Browse
-                        </button>
-                        <button
-                            className="nav-link nav-link-active"
-                            type="button"
-                            onClick={() =>
-                                (window.location.hash = "#/ingredients")
-                            }
-                        >
-                            Ingredients
-                        </button>
-                        <button
-                            className="nav-link"
-                            type="button"
-                            title="Coming soon"
-                        >
-                            Meal Plans
-                        </button>
-                    </nav>
-
-                    <div className="auth">
-                        {session ? (
-                            <>
-                                <span className="muted" style={{ fontSize: 13 }}>
-                                    {session.user.email}
-                                </span>
-                                <button
-                                    className="btn btn-ghost"
-                                    type="button"
-                                    onClick={handleLogout}
-                                >
-                                    Log out
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                <button
-                                    className="btn btn-ghost"
-                                    type="button"
-                                    onClick={() =>
-                                        (window.location.hash = "#/login")
-                                    }
-                                >
-                                    Log in
-                                </button>
-                                <button
-                                    className="btn btn-primary"
-                                    type="button"
-                                    onClick={() =>
-                                        (window.location.hash = "#/login")
-                                    }
-                                >
-                                    Sign up
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </header>
-
+                <TopBar route={route} session={session} onLogout={handleLogout} />
                 <main className="page">
                     <section className="section ingredients-hero">
                         <div className="ingredients-banner">
@@ -457,15 +388,6 @@ function App() {
                                     ingredient cards loaded from Supabase.
                                 </p>
                             </div>
-                            <div className="hero-actions">
-                                <button
-                                    className="btn btn-outline"
-                                    type="button"
-                                    onClick={() => (window.location.hash = "#/")}
-                                >
-                                    Back to home
-                                </button>
-                            </div>
                         </div>
                     </section>
 
@@ -473,8 +395,7 @@ function App() {
                         <div className="section-head">
                             <h2 className="section-title">Ingredient library</h2>
                             <p className="section-sub">
-                                Sorted alphabetically from your `ingredient`
-                                table.
+                                Sorted alphabetically from your `ingredient` table.
                             </p>
                         </div>
 
@@ -506,8 +427,7 @@ function App() {
                                             aria-hidden="true"
                                         >
                                             <span className="pill ingredient-pill">
-                                                Ingredient #
-                                                {ingredient.ingredient_id}
+                                                Ingredient #{ingredient.ingredient_id}
                                             </span>
                                         </div>
 
@@ -522,9 +442,7 @@ function App() {
                                             </div>
 
                                             <div className="ingredient-metrics">
-                                                {formatCalories(
-                                                    ingredient.calories,
-                                                )}
+                                                {formatCalories(ingredient.calories)}
                                             </div>
 
                                             <div className="recipe-desc2">
@@ -537,15 +455,6 @@ function App() {
                             </div>
                         )}
                     </section>
-
-                    <footer className="footer">
-                        <div className="footer-inner">
-                            <span>
-                                Â© {new Date().getFullYear()} Recipe Meal Planner
-                            </span>
-                            <span className="muted"></span>
-                        </div>
-                    </footer>
                 </main>
             </div>
         );
@@ -554,80 +463,6 @@ function App() {
     return (
         <div className="app-shell">
             <TopBar route={route} session={session} onLogout={handleLogout} />
-            <header className="topbar">
-                <div className="brand">
-                    <div className="brand-mark" aria-hidden="true">
-                        🍳
-                    </div>
-                    <div className="brand-text">
-                        <div className="brand-name">Recipe Meal Planner</div>
-                        <div className="brand-sub">
-                            Find recipes • Save favorites • Plan your week
-                        </div>
-                    </div>
-                </div>
-
-                <nav className="topnav">
-                    <button
-                        className="nav-link"
-                        type="button"
-                        onClick={() => (window.location.hash = "#/")}
-                    >
-                        Browse
-                    </button>
-                    <button
-                        className="nav-link"
-                        type="button"
-                        onClick={() => (window.location.hash = "#/ingredients")}
-                    >
-                        Ingredients
-                    </button>
-                    <button
-                        className="nav-link"
-                        type="button"
-                        title="Coming soon"
-                    >
-                        Meal Plans
-                    </button>
-                </nav>
-                <div className="auth">
-                    {session ? (
-                        <>
-                            <span className="muted" style={{ fontSize: 13 }}>
-                                {session.user.email}
-                            </span>
-                            <button
-                                className="btn btn-ghost"
-                                type="button"
-                                onClick={handleLogout}
-                            >
-                                Log out
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                className="btn btn-ghost"
-                                type="button"
-                                onClick={() =>
-                                    (window.location.hash = "#/login")
-                                }
-                            >
-                                Log in
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                type="button"
-                                onClick={() =>
-                                    (window.location.hash = "#/login")
-                                }
-                            >
-                                Sign up
-                            </button>
-                        </>
-                    )}
-                </div>
-            </header>
 
             <main className="page">
                 <section className="hero">
