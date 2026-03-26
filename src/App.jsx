@@ -6,27 +6,59 @@ function getApiBaseUrl() {
   return import.meta.env.VITE_API_BASE_URL || 'https://recipe-backend-production-2e13.up.railway.app'
 }
 
-function sampleRandomItems(items, count) {
-  const copied = [...items]
-  for (let i = copied.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[copied[i], copied[j]] = [copied[j], copied[i]]
-  }
-  return copied.slice(0, count)
+function normalizeFeaturedRecipe(recipe, index) {
+  const id = recipe?.id ?? `featured-${index}`
+  const title = recipe?.name ?? `Recipe ${index + 1}`
+  const time =
+    typeof recipe?.cookTimeMinutes === 'number'
+      ? `${recipe.cookTimeMinutes} min`
+      : 'Time not listed'
+  const tag = recipe?.category ?? recipe?.cuisine ?? recipe?.difficulty ?? 'Featured'
+  const imageUrl = recipe?.imageUrl ?? null
+
+  return { id, title, time, tag, imageUrl }
 }
 
-function normalizeFeaturedRecipe(recipe, index) {
-  const id = recipe.id ?? recipe.recipe_id ?? `featured-${index}`
-  const title = recipe.name ?? recipe.title ?? `Recipe ${index + 1}`
-  const rawTime =
-    recipe.cookTimeMinutes ??
-    recipe.cook_time_minutes ??
-    recipe.totalTimeMinutes ??
-    recipe.time
-  const time = typeof rawTime === 'number' ? `${rawTime} min` : rawTime || 'New'
-  const tag = recipe.category ?? recipe.cuisine ?? recipe.difficulty ?? 'Featured'
+const FEATURED_RETRY_DELAYS_MS = [250, 500, 750, 1000, 1500, 2000, 3000]
+const FEATURED_CACHE_KEY = 'featured-recipes-today'
 
-  return { id, title, time, tag }
+function getCurrentUtcDayKey() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function readFeaturedCache() {
+  try {
+    const raw = window.localStorage.getItem(FEATURED_CACHE_KEY)
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw)
+    if (
+      !parsed ||
+      parsed.dayKey !== getCurrentUtcDayKey() ||
+      !Array.isArray(parsed.recipes)
+    ) {
+      return null
+    }
+
+    return parsed.recipes
+  } catch (err) {
+    console.error('Failed to read featured recipe cache.', err)
+    return null
+  }
+}
+
+function writeFeaturedCache(recipes) {
+  try {
+    window.localStorage.setItem(
+      FEATURED_CACHE_KEY,
+      JSON.stringify({
+        dayKey: getCurrentUtcDayKey(),
+        recipes,
+      })
+    )
+  } catch (err) {
+    console.error('Failed to write featured recipe cache.', err)
+  }
 }
 
 function App() {
@@ -53,35 +85,47 @@ function App() {
 
     const loadFeatured = async () => {
       setFeaturedError('')
+      const cachedFeatured = readFeaturedCache()
+      if (cachedFeatured?.length) {
+        setFeatured(cachedFeatured)
+        setFeaturedLoading(false)
+        return
+      }
+
       setFeaturedLoading(true)
-      try {
-        const response = await fetch(`${getApiBaseUrl()}/api/recipes`)
-        if (!response.ok) {
-          throw new Error(`Failed to load featured recipes (${response.status})`)
-        }
+      let attempt = 0
 
-        const payload = await response.json()
-        const list = Array.isArray(payload) ? payload : payload?.content
-        if (!Array.isArray(list)) {
-          throw new Error('Recipes response did not return a list.')
-        }
+      while (!cancelled) {
+        try {
+          const response = await fetch(`${getApiBaseUrl()}/api/recipes/featured/today`, {
+            cache: 'no-store',
+          })
+          if (!response.ok) {
+            throw new Error(`Failed to load featured recipes (${response.status})`)
+          }
 
-        const picked = sampleRandomItems(list, 6).map((recipe, index) =>
-          normalizeFeaturedRecipe(recipe, index)
-        )
+          const payload = await response.json()
+          if (!Array.isArray(payload)) {
+            throw new Error('Featured recipes response did not return a list.')
+          }
 
-        if (!cancelled) {
-          setFeatured(picked)
-        }
-      } catch (err) {
-        console.error(err)
-        if (!cancelled) {
-          setFeatured([])
-          setFeaturedError('Could not load featured recipes from backend yet.')
-        }
-      } finally {
-        if (!cancelled) {
-          setFeaturedLoading(false)
+          const adapted = payload.map((recipe, index) => normalizeFeaturedRecipe(recipe, index))
+
+          if (!cancelled) {
+            setFeatured(adapted)
+            writeFeaturedCache(adapted)
+            setFeaturedError('')
+            setFeaturedLoading(false)
+          }
+          return
+        } catch (err) {
+          console.error(err)
+          const delay = FEATURED_RETRY_DELAYS_MS[Math.min(attempt, FEATURED_RETRY_DELAYS_MS.length - 1)]
+          attempt += 1
+
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, delay)
+          })
         }
       }
     }
@@ -97,6 +141,7 @@ function App() {
     () => ['Popular', 'Under 30 min', 'Vegetarian', 'High Protein', 'Budget', 'Meal Prep'],
     []
   )
+  const featuredSkeletons = useMemo(() => Array.from({ length: 6 }, (_, index) => `featured-skeleton-${index}`), [])
 
   const onSearch = (e) => {
     e.preventDefault()
@@ -214,6 +259,13 @@ function App() {
               </div>
               <div className="phone-body">
                 <div className="mini-title">Featured today</div>
+                {featuredLoading &&
+                  featuredSkeletons.slice(0, 3).map((key) => (
+                    <div key={key} className="mini-card mini-card-skeleton" aria-hidden="true">
+                      <div className="mini-card-title mini-card-title-skeleton skeleton-block" />
+                      <div className="mini-card-meta mini-card-meta-skeleton skeleton-block" />
+                    </div>
+                  ))}
                 {featured.slice(0, 3).map((r) => (
                   <div key={r.id} className="mini-card">
                     <div className="mini-card-title">{r.title}</div>
@@ -274,23 +326,45 @@ function App() {
         <section className="section">
           <div className="section-head">
             <h2 className="section-title">Featured recipes</h2>
-            <p className="section-sub">Loaded from the backend recipes API.</p>
+            <p className="section-sub">Loaded from the backend featured recipes API.</p>
           </div>
 
-          {featuredLoading && <p className="muted">Loading featured recipes...</p>}
           {featuredError && <div className="banner banner-warn">{featuredError}</div>}
+          {!featuredLoading && !featuredError && featured.length === 0 && (
+            <p className="muted">No featured recipes are available yet.</p>
+          )}
 
           <div className="carousel">
+            {featuredLoading &&
+              featuredSkeletons.map((key) => (
+                <article key={key} className="recipe-card recipe-card-skeleton" aria-hidden="true">
+                  <div className="recipe-thumb recipe-thumb-skeleton">
+                    <span className="recipe-tag recipe-tag-skeleton skeleton-block" />
+                  </div>
+                  <div className="recipe-body">
+                    <div className="recipe-title recipe-title-skeleton skeleton-block" />
+                    <div className="recipe-meta recipe-meta-skeleton skeleton-block" />
+                    <div className="recipe-actions">
+                      <span className="btn-skeleton skeleton-block" />
+                      <span className="btn-skeleton skeleton-block" />
+                    </div>
+                  </div>
+                </article>
+              ))}
             {featured.map((r) => (
               <article key={r.id} className="recipe-card">
-                <div className="recipe-thumb" aria-hidden="true">
+                <div
+                  className="recipe-thumb"
+                  aria-hidden="true"
+                  style={r.imageUrl ? { backgroundImage: `url(${r.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                >
                   <span className="recipe-tag">{r.tag}</span>
                 </div>
                 <div className="recipe-body">
                   <div className="recipe-title">{r.title}</div>
                   <div className="recipe-meta">{r.time}</div>
                   <div className="recipe-actions">
-                    <button className="btn btn-small btn-ghost" type="button" onClick={() => alert('View recipe (next)')}>
+                    <button className="btn btn-small btn-ghost" type="button" onClick={() => alert(`View recipe ${r.id} (next)`)}>
                       View
                     </button>
                     <button className="btn btn-small btn-outline" type="button" onClick={() => alert('Save recipe (requires auth)')}>
