@@ -23,22 +23,50 @@ function normalizeFeaturedRecipe(recipe, index) {
         recipe.cook_time_minutes ??
         recipe.totalTimeMinutes ??
         recipe.time;
-    const time =
-        typeof rawTime === "number" ? `${rawTime} min` : rawTime || "New";
+    const time = typeof rawTime === "number" ? `${rawTime} min` : rawTime || "";
     const tag =
         recipe.category ?? recipe.cuisine ?? recipe.difficulty ?? "Featured";
 
-    return { id, title, time, tag };
+    return { id, title, time, tag, details: recipe };
+}
+
+function toLabel(key) {
+    return key
+        .replace(/([A-Z])/g, " $1")
+        .replace(/_/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/^./, (char) => char.toUpperCase());
+}
+
+function toDisplayValue(value) {
+    if (value == null || value === "") return "N/A";
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+}
+
+function shouldShowRecipeDetail(key) {
+    const normalized = key.toLowerCase();
+    return ![
+        "originaluser",
+        "original_user",
+        "recipeid",
+        "recipe_id",
+        "user",
+        "userid",
+        "user_id",
+    ].includes(normalized);
 }
 
 function getRouteFromHash() {
-    if (window.location.hash === "#/login") {
+    const hashPath = window.location.hash.split("?")[0];
+    if (hashPath === "#/login") {
         return "login";
     }
-    if (window.location.hash === "#/recipes") {
+    if (hashPath === "#/recipes") {
         return "recipes";
     }
-    if (window.location.hash === "#/meal-plans") {
+    if (hashPath === "#/meal-plans") {
         return "meal-plans";
     }
     return "home";
@@ -135,6 +163,7 @@ function App() {
     const [featured, setFeatured] = useState([]);
     const [featuredLoading, setFeaturedLoading] = useState(true);
     const [featuredError, setFeaturedError] = useState("");
+    const [selectedFeaturedRecipe, setSelectedFeaturedRecipe] = useState(null);
 
     const [route, setRoute] = useState(() => getRouteFromHash());
 
@@ -226,7 +255,11 @@ function App() {
 
     const onSearch = (e) => {
         e.preventDefault();
-        alert(`Search (UI only for now): "${query}"`);
+        const trimmed = query.trim();
+        const searchSuffix = trimmed
+            ? `?q=${encodeURIComponent(trimmed)}`
+            : "";
+        window.location.hash = `#/recipes${searchSuffix}`;
     };
 
     const loadRecipes = async () => {
@@ -493,21 +526,10 @@ function App() {
                                             className="btn btn-small btn-ghost"
                                             type="button"
                                             onClick={() =>
-                                                alert("View recipe (next)")
+                                                setSelectedFeaturedRecipe(r)
                                             }
                                         >
                                             View
-                                        </button>
-                                        <button
-                                            className="btn btn-small btn-outline"
-                                            type="button"
-                                            onClick={() =>
-                                                alert(
-                                                    "Save recipe (requires auth)",
-                                                )
-                                            }
-                                        >
-                                            Save
                                         </button>
                                     </div>
                                 </div>
@@ -562,6 +584,51 @@ function App() {
                         <span className="muted"></span>
                     </div>
                 </footer>
+
+                {selectedFeaturedRecipe && (
+                    <div
+                        className="modal-backdrop"
+                        role="presentation"
+                        onClick={() => setSelectedFeaturedRecipe(null)}
+                    >
+                        <div
+                            className="modal"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Recipe details"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="modal-head">
+                                <h3 className="modal-title">
+                                    {selectedFeaturedRecipe.title}
+                                </h3>
+                                <button
+                                    className="btn btn-small btn-ghost"
+                                    type="button"
+                                    onClick={() => setSelectedFeaturedRecipe(null)}
+                                >
+                                    Close
+                                </button>
+                            </div>
+                            <div className="modal-body">
+                                {Object.entries(
+                                    selectedFeaturedRecipe.details ?? {},
+                                )
+                                    .filter(([key]) => shouldShowRecipeDetail(key))
+                                    .map(([key, value]) => (
+                                    <div key={key} className="modal-row">
+                                        <div className="modal-key">
+                                            {toLabel(key)}
+                                        </div>
+                                        <div className="modal-value">
+                                            {toDisplayValue(value)}
+                                        </div>
+                                    </div>
+                                    ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );

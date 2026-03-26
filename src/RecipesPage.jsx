@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
 
+function getSearchQueryFromHash() {
+    const [, queryString = ""] = window.location.hash.split("?");
+    const params = new URLSearchParams(queryString);
+    return params.get("q") ?? "";
+}
+
 function getRecipeId(recipe, index) {
     return recipe.recipeId ?? recipe.recipe_id ?? recipe.id ?? `recipe-${index}`;
 }
@@ -112,7 +118,7 @@ export default function RecipesPage({ session }) {
     const [actionError, setActionError] = useState("");
     const [mealPlanError, setMealPlanError] = useState("");
     const [recipes, setRecipes] = useState([]);
-    const [searchTerm, setSearchTerm] = useState("");
+    const [searchTerm, setSearchTerm] = useState(() => getSearchQueryFromHash());
     const [mealPlans, setMealPlans] = useState([]);
     const [selectedPlanByRecipe, setSelectedPlanByRecipe] = useState({});
     const [existingEntryKeys, setExistingEntryKeys] = useState([]);
@@ -224,6 +230,14 @@ export default function RecipesPage({ session }) {
             cancelled = true;
         };
     }, [session?.user?.id, session?.user?.email]);
+
+    useEffect(() => {
+        const syncSearchFromHash = () => {
+            setSearchTerm(getSearchQueryFromHash());
+        };
+        window.addEventListener("hashchange", syncSearchFromHash);
+        return () => window.removeEventListener("hashchange", syncSearchFromHash);
+    }, []);
 
     const addToMealPlan = async (recipe, index) => {
         if (!session) {
