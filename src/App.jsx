@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import LoginPage from "./LoginPage";
+import MealPlansPage from "./MealPlansPage";
+import RecipesPage from "./RecipesPage";
 import { useAuth } from "./AuthContext";
 import { supabase } from "./lib/supabaseClient";
-import { apiFetch } from "./api";
+
+function getApiBaseUrl() {
+    return (
+        import.meta.env.VITE_API_BASE_URL ||
+        "https://recipe-backend-production-2e13.up.railway.app"
+    );
+}
 
 function sampleRandomItems(items, count) {
     const copied = [...items];
@@ -29,6 +37,102 @@ function normalizeFeaturedRecipe(recipe, index) {
     return { id, title, time, tag };
 }
 
+function getRouteFromHash() {
+    if (window.location.hash === "#/login") {
+        return "login";
+    }
+    if (window.location.hash === "#/recipes") {
+        return "recipes";
+    }
+    if (window.location.hash === "#/meal-plans") {
+        return "meal-plans";
+    }
+    return "home";
+}
+
+function TopBar({ route, session, onLogout }) {
+    return (
+        <header className="topbar">
+            <div
+                className="brand"
+                role="button"
+                tabIndex={0}
+                onClick={() => (window.location.hash = "#/")}
+                onKeyDown={(e) =>
+                    e.key === "Enter" && (window.location.hash = "#/")
+                }
+            >
+                <div className="brand-mark" aria-hidden="true">
+                    🍳
+                </div>
+                <div className="brand-text">
+                    <div className="brand-name">Recipe Meal Planner</div>
+                    <div className="brand-sub">
+                        Find recipes • Save favorites • Plan your week
+                    </div>
+                </div>
+            </div>
+
+            <nav className="topnav">
+                <button
+                    className={`nav-link ${route === "home" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => (window.location.hash = "#/")}
+                >
+                    Home
+                </button>
+                <button
+                    className={`nav-link ${route === "recipes" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => (window.location.hash = "#/recipes")}
+                >
+                    Recipes
+                </button>
+                <button
+                    className={`nav-link ${route === "meal-plans" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => (window.location.hash = "#/meal-plans")}
+                >
+                    Meal Plans
+                </button>
+            </nav>
+            <div className="auth">
+                {session ? (
+                    <>
+                        <span className="muted" style={{ fontSize: 13 }}>
+                            {session.user.email}
+                        </span>
+                        <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={onLogout}
+                        >
+                            Log out
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={() => (window.location.hash = "#/login")}
+                        >
+                            Log in
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            type="button"
+                            onClick={() => (window.location.hash = "#/login")}
+                        >
+                            Sign up
+                        </button>
+                    </>
+                )}
+            </div>
+        </header>
+    );
+}
+
 function App() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
@@ -38,19 +142,21 @@ function App() {
     const [featuredLoading, setFeaturedLoading] = useState(true);
     const [featuredError, setFeaturedError] = useState("");
 
-    const [route, setRoute] = useState(() =>
-        window.location.hash === "#/login" ? "login" : "home",
-    );
+    const [route, setRoute] = useState(() => getRouteFromHash());
 
     const { session } = useAuth();
 
     const handleLogout = async () => {
+        if (!supabase) {
+            window.location.hash = "#/login";
+            return;
+        }
         await supabase.auth.signOut();
     };
 
     useEffect(() => {
         const onHashChange = () => {
-            setRoute(window.location.hash === "#/login" ? "login" : "home");
+            setRoute(getRouteFromHash());
         };
         window.addEventListener("hashchange", onHashChange);
         return () => window.removeEventListener("hashchange", onHashChange);
@@ -63,8 +169,17 @@ function App() {
             setFeaturedError("");
             setFeaturedLoading(true);
             try {
-                const list = await apiFetch("/api/recipes");
+                const response = await fetch(`${getApiBaseUrl()}/api/recipes`);
+                if (!response.ok) {
+                    throw new Error(
+                        `Failed to load featured recipes (${response.status})`,
+                    );
+                }
 
+                const payload = await response.json();
+                const list = Array.isArray(payload)
+                    ? payload
+                    : payload?.content;
                 if (!Array.isArray(list)) {
                     throw new Error("Recipes response did not return a list.");
                 }
@@ -80,18 +195,9 @@ function App() {
                 console.error(err);
                 if (!cancelled) {
                     setFeatured([]);
-                    if (
-                        err.message.includes("Unauthorized") ||
-                        err.message.includes("Not authenticated")
-                    ) {
-                        setFeaturedError(
-                            "Please log in to view featured recipes.",
-                        );
-                    } else {
-                        setFeaturedError(
-                            "Could not load featured recipes from backend yet.",
-                        );
-                    }
+                    setFeaturedError(
+                        "Could not load featured recipes from backend yet.",
+                    );
                 }
             } finally {
                 if (!cancelled) {
@@ -126,21 +232,26 @@ function App() {
 
     const loadRecipes = async () => {
         setError("");
+        if (!supabase) {
+            setError(
+                "Supabase is not configured yet. Make sure your .env has VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart.",
+            );
+            return;
+        }
+
         setLoading(true);
         try {
-            const data = await apiFetch("/api/recipes");
+            // Match your schema: recipe_id, user_id, name, description, instructions
+            const { data, error } = await supabase
+                .from("Recipes")
+                .select("recipe_id, user_id, name, description, instructions")
+                .limit(20);
+
+            if (error) throw error;
             setRecipes(data ?? []);
         } catch (err) {
             console.error(err);
-            if (
-                err.message.includes("Unauthorized") ||
-                err.message.includes("Not authenticated")
-            ) {
-                setError("Please log in to load recipes.");
-                window.location.hash = "#/login";
-            } else {
-                setError("Could not load recipes from backend.");
-            }
+            setError("Could not load recipes from Supabase yet.");
             setRecipes([]);
         } finally {
             setLoading(false);
@@ -151,82 +262,27 @@ function App() {
         return <LoginPage />;
     }
 
+    if (route === "recipes") {
+        return (
+            <div className="app-shell">
+                <TopBar route={route} session={session} onLogout={handleLogout} />
+                <RecipesPage session={session} />
+            </div>
+        );
+    }
+
+    if (route === "meal-plans") {
+        return (
+            <div className="app-shell">
+                <TopBar route={route} session={session} onLogout={handleLogout} />
+                <MealPlansPage session={session} />
+            </div>
+        );
+    }
+
     return (
         <div className="app-shell">
-            <header className="topbar">
-                <div className="brand">
-                    <div className="brand-mark" aria-hidden="true">
-                        🍳
-                    </div>
-                    <div className="brand-text">
-                        <div className="brand-name">Recipe Meal Planner</div>
-                        <div className="brand-sub">
-                            Find recipes • Save favorites • Plan your week
-                        </div>
-                    </div>
-                </div>
-
-                <nav className="topnav">
-                    <button
-                        className="nav-link"
-                        type="button"
-                        title="Coming soon"
-                    >
-                        Browse
-                    </button>
-                    <button
-                        className="nav-link"
-                        type="button"
-                        title="Coming soon"
-                    >
-                        Ingredients
-                    </button>
-                    <button
-                        className="nav-link"
-                        type="button"
-                        title="Coming soon"
-                    >
-                        Meal Plans
-                    </button>
-                </nav>
-                <div className="auth">
-                    {session ? (
-                        <>
-                            <span className="muted" style={{ fontSize: 13 }}>
-                                {session.user.email}
-                            </span>
-                            <button
-                                className="btn btn-ghost"
-                                type="button"
-                                onClick={handleLogout}
-                            >
-                                Log out
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                className="btn btn-ghost"
-                                type="button"
-                                onClick={() =>
-                                    (window.location.hash = "#/login")
-                                }
-                            >
-                                Log in
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                type="button"
-                                onClick={() =>
-                                    (window.location.hash = "#/login")
-                                }
-                            >
-                                Sign up
-                            </button>
-                        </>
-                    )}
-                </div>
-            </header>
+            <TopBar route={route} session={session} onLogout={handleLogout} />
 
             <main className="page">
                 <section className="hero">
