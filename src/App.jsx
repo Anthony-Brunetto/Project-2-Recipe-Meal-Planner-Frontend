@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import LoginPage from "./LoginPage";
+import MealPlansPage from "./MealPlansPage";
+import RecipesPage from "./RecipesPage";
 import { useAuth } from "./AuthContext";
 import { supabase } from "./lib/supabaseClient";
 import { apiFetch } from "./api";
@@ -29,6 +31,102 @@ function normalizeFeaturedRecipe(recipe, index) {
     return { id, title, time, tag };
 }
 
+function getRouteFromHash() {
+    if (window.location.hash === "#/login") {
+        return "login";
+    }
+    if (window.location.hash === "#/recipes") {
+        return "recipes";
+    }
+    if (window.location.hash === "#/meal-plans") {
+        return "meal-plans";
+    }
+    return "home";
+}
+
+function TopBar({ route, session, onLogout }) {
+    return (
+        <header className="topbar">
+            <div
+                className="brand"
+                role="button"
+                tabIndex={0}
+                onClick={() => (window.location.hash = "#/")}
+                onKeyDown={(e) =>
+                    e.key === "Enter" && (window.location.hash = "#/")
+                }
+            >
+                <div className="brand-mark" aria-hidden="true">
+                    🍳
+                </div>
+                <div className="brand-text">
+                    <div className="brand-name">MealMap</div>
+                    <div className="brand-sub">
+                        Find recipes • Save favorites • Plan your week
+                    </div>
+                </div>
+            </div>
+
+            <nav className="topnav">
+                <button
+                    className={`nav-link ${route === "home" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => (window.location.hash = "#/")}
+                >
+                    Home
+                </button>
+                <button
+                    className={`nav-link ${route === "recipes" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => (window.location.hash = "#/recipes")}
+                >
+                    Recipes
+                </button>
+                <button
+                    className={`nav-link ${route === "meal-plans" ? "active" : ""}`}
+                    type="button"
+                    onClick={() => (window.location.hash = "#/meal-plans")}
+                >
+                    Meal Plans
+                </button>
+            </nav>
+            <div className="auth">
+                {session ? (
+                    <>
+                        <span className="muted" style={{ fontSize: 13 }}>
+                            {session.user.email}
+                        </span>
+                        <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={onLogout}
+                        >
+                            Log out
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button
+                            className="btn btn-ghost"
+                            type="button"
+                            onClick={() => (window.location.hash = "#/login")}
+                        >
+                            Log in
+                        </button>
+                        <button
+                            className="btn btn-primary"
+                            type="button"
+                            onClick={() => (window.location.hash = "#/login")}
+                        >
+                            Sign up
+                        </button>
+                    </>
+                )}
+            </div>
+        </header>
+    );
+}
+
 function App() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
@@ -38,9 +136,7 @@ function App() {
     const [featuredLoading, setFeaturedLoading] = useState(true);
     const [featuredError, setFeaturedError] = useState("");
 
-    const [route, setRoute] = useState(() =>
-        window.location.hash === "#/login" ? "login" : "home",
-    );
+    const [route, setRoute] = useState(() => getRouteFromHash());
 
     const { session } = useAuth();
 
@@ -50,7 +146,7 @@ function App() {
 
     useEffect(() => {
         const onHashChange = () => {
-            setRoute(window.location.hash === "#/login" ? "login" : "home");
+            setRoute(getRouteFromHash());
         };
         window.addEventListener("hashchange", onHashChange);
         return () => window.removeEventListener("hashchange", onHashChange);
@@ -60,6 +156,15 @@ function App() {
         let cancelled = false;
 
         const loadFeatured = async () => {
+            if (!session) {
+                if (!cancelled) {
+                    setFeatured([]);
+                    setFeaturedLoading(false);
+                    setFeaturedError("");
+                }
+                return;
+            }
+
             setFeaturedError("");
             setFeaturedLoading(true);
             try {
@@ -105,7 +210,7 @@ function App() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [session?.user?.id]);
 
     const quickFilters = useMemo(
         () => [
@@ -151,82 +256,27 @@ function App() {
         return <LoginPage />;
     }
 
+    if (route === "recipes") {
+        return (
+            <div className="app-shell">
+                <TopBar route={route} session={session} onLogout={handleLogout} />
+                <RecipesPage session={session} />
+            </div>
+        );
+    }
+
+    if (route === "meal-plans") {
+        return (
+            <div className="app-shell">
+                <TopBar route={route} session={session} onLogout={handleLogout} />
+                <MealPlansPage session={session} />
+            </div>
+        );
+    }
+
     return (
         <div className="app-shell">
-            <header className="topbar">
-                <div className="brand">
-                    <div className="brand-mark" aria-hidden="true">
-                        🍳
-                    </div>
-                    <div className="brand-text">
-                        <div className="brand-name">Recipe Meal Planner</div>
-                        <div className="brand-sub">
-                            Find recipes • Save favorites • Plan your week
-                        </div>
-                    </div>
-                </div>
-
-                <nav className="topnav">
-                    <button
-                        className="nav-link"
-                        type="button"
-                        title="Coming soon"
-                    >
-                        Browse
-                    </button>
-                    <button
-                        className="nav-link"
-                        type="button"
-                        title="Coming soon"
-                    >
-                        Ingredients
-                    </button>
-                    <button
-                        className="nav-link"
-                        type="button"
-                        title="Coming soon"
-                    >
-                        Meal Plans
-                    </button>
-                </nav>
-                <div className="auth">
-                    {session ? (
-                        <>
-                            <span className="muted" style={{ fontSize: 13 }}>
-                                {session.user.email}
-                            </span>
-                            <button
-                                className="btn btn-ghost"
-                                type="button"
-                                onClick={handleLogout}
-                            >
-                                Log out
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                className="btn btn-ghost"
-                                type="button"
-                                onClick={() =>
-                                    (window.location.hash = "#/login")
-                                }
-                            >
-                                Log in
-                            </button>
-                            <button
-                                className="btn btn-primary"
-                                type="button"
-                                onClick={() =>
-                                    (window.location.hash = "#/login")
-                                }
-                            >
-                                Sign up
-                            </button>
-                        </>
-                    )}
-                </div>
-            </header>
+            <TopBar route={route} session={session} onLogout={handleLogout} />
 
             <main className="page">
                 <section className="hero">
@@ -507,7 +557,7 @@ function App() {
                 <footer className="footer">
                     <div className="footer-inner">
                         <span>
-                            © {new Date().getFullYear()} Recipe Meal Planner
+                            © {new Date().getFullYear()} MealMap
                         </span>
                         <span className="muted"></span>
                     </div>
