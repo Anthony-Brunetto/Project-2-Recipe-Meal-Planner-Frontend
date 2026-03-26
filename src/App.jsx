@@ -6,6 +6,12 @@ import { useAuth } from "./AuthContext";
 import { supabase } from "./lib/supabaseClient";
 import { apiFetch } from "./api";
 
+function getRouteFromHash(hash) {
+    if (hash === "#/login") return "login";
+    if (hash === "#/ingredients") return "ingredients";
+    return "home";
+}
+
 function sampleRandomItems(items, count) {
     const copied = [...items];
     for (let i = copied.length - 1; i > 0; i -= 1) {
@@ -155,6 +161,10 @@ function TopBar({ route, session, onLogout }) {
     );
 }
 
+function formatCalories(value) {
+    return typeof value === "number" ? `${value} cal` : "Calories unknown";
+}
+
 function App() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
@@ -164,8 +174,11 @@ function App() {
     const [featuredLoading, setFeaturedLoading] = useState(true);
     const [featuredError, setFeaturedError] = useState("");
     const [selectedFeaturedRecipe, setSelectedFeaturedRecipe] = useState(null);
+    const [ingredients, setIngredients] = useState([]);
+    const [ingredientsLoading, setIngredientsLoading] = useState(false);
+    const [ingredientsError, setIngredientsError] = useState("");
 
-    const [route, setRoute] = useState(() => getRouteFromHash());
+    const [route, setRoute] = useState(() => getRouteFromHash(window.location.hash));
 
     const { session } = useAuth();
 
@@ -175,11 +188,61 @@ function App() {
 
     useEffect(() => {
         const onHashChange = () => {
-            setRoute(getRouteFromHash());
+            setRoute(getRouteFromHash(window.location.hash));
         };
         window.addEventListener("hashchange", onHashChange);
         return () => window.removeEventListener("hashchange", onHashChange);
     }, []);
+
+    useEffect(() => {
+        if (route !== "ingredients") {
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadIngredients = async () => {
+            setIngredientsError("");
+            setIngredientsLoading(true);
+
+            try {
+                if (!supabase) {
+                    throw new Error("Supabase is not configured.");
+                }
+
+                const { data, error } = await supabase
+                    .from("ingredient")
+                    .select(
+                        "ingredient_id, ingredient_name, description, unit, calories",
+                    )
+                    .order("ingredient_name", { ascending: true });
+
+                if (error) throw error;
+
+                if (!cancelled) {
+                    setIngredients(data ?? []);
+                }
+            } catch (err) {
+                console.error(err);
+                if (!cancelled) {
+                    setIngredients([]);
+                    setIngredientsError(
+                        "Could not load ingredients from Supabase.",
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setIngredientsLoading(false);
+                }
+            }
+        };
+
+        loadIngredients();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [route]);
 
     useEffect(() => {
         let cancelled = false;
@@ -303,6 +366,187 @@ function App() {
             <div className="app-shell">
                 <TopBar route={route} session={session} onLogout={handleLogout} />
                 <MealPlansPage session={session} />
+    if (route === "ingredients") {
+        return (
+            <div className="app-shell">
+                <header className="topbar">
+                    <div className="brand">
+                        <div className="brand-mark" aria-hidden="true">
+                            ðŸ³
+                        </div>
+                        <div className="brand-text">
+                            <div className="brand-name">Recipe Meal Planner</div>
+                            <div className="brand-sub">
+                                Find recipes â€¢ Save favorites â€¢ Plan your week
+                            </div>
+                        </div>
+                    </div>
+
+                    <nav className="topnav">
+                        <button
+                            className="nav-link"
+                            type="button"
+                            onClick={() => (window.location.hash = "#/")}
+                        >
+                            Browse
+                        </button>
+                        <button
+                            className="nav-link nav-link-active"
+                            type="button"
+                            onClick={() =>
+                                (window.location.hash = "#/ingredients")
+                            }
+                        >
+                            Ingredients
+                        </button>
+                        <button
+                            className="nav-link"
+                            type="button"
+                            title="Coming soon"
+                        >
+                            Meal Plans
+                        </button>
+                    </nav>
+
+                    <div className="auth">
+                        {session ? (
+                            <>
+                                <span className="muted" style={{ fontSize: 13 }}>
+                                    {session.user.email}
+                                </span>
+                                <button
+                                    className="btn btn-ghost"
+                                    type="button"
+                                    onClick={handleLogout}
+                                >
+                                    Log out
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    className="btn btn-ghost"
+                                    type="button"
+                                    onClick={() =>
+                                        (window.location.hash = "#/login")
+                                    }
+                                >
+                                    Log in
+                                </button>
+                                <button
+                                    className="btn btn-primary"
+                                    type="button"
+                                    onClick={() =>
+                                        (window.location.hash = "#/login")
+                                    }
+                                >
+                                    Sign up
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </header>
+
+                <main className="page">
+                    <section className="section ingredients-hero">
+                        <div className="ingredients-banner">
+                            <div className="section-head ingredients-head">
+                                <h1 className="hero-title">Ingredients</h1>
+                                <p className="hero-copy">
+                                    Browse the pantry-side of your app with live
+                                    ingredient cards loaded from Supabase.
+                                </p>
+                            </div>
+                            <div className="hero-actions">
+                                <button
+                                    className="btn btn-outline"
+                                    type="button"
+                                    onClick={() => (window.location.hash = "#/")}
+                                >
+                                    Back to home
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="section">
+                        <div className="section-head">
+                            <h2 className="section-title">Ingredient library</h2>
+                            <p className="section-sub">
+                                Sorted alphabetically from your `ingredient`
+                                table.
+                            </p>
+                        </div>
+
+                        {ingredientsLoading && (
+                            <div className="banner">Loading ingredients...</div>
+                        )}
+                        {ingredientsError && (
+                            <div className="banner banner-warn">
+                                {ingredientsError}
+                            </div>
+                        )}
+                        {!ingredientsLoading &&
+                            !ingredientsError &&
+                            !ingredients.length && (
+                                <div className="banner">
+                                    No ingredients were returned from Supabase.
+                                </div>
+                            )}
+
+                        {!!ingredients.length && (
+                            <div className="ingredient-grid">
+                                {ingredients.map((ingredient) => (
+                                    <article
+                                        key={ingredient.ingredient_id}
+                                        className="ingredient-card"
+                                    >
+                                        <div
+                                            className="ingredient-thumb"
+                                            aria-hidden="true"
+                                        >
+                                            <span className="pill ingredient-pill">
+                                                Ingredient #
+                                                {ingredient.ingredient_id}
+                                            </span>
+                                        </div>
+
+                                        <div className="recipe-body2">
+                                            <div className="ingredient-topline">
+                                                <div className="recipe-title2">
+                                                    {ingredient.ingredient_name}
+                                                </div>
+                                                <span className="ingredient-unit">
+                                                    {ingredient.unit || "Unit n/a"}
+                                                </span>
+                                            </div>
+
+                                            <div className="ingredient-metrics">
+                                                {formatCalories(
+                                                    ingredient.calories,
+                                                )}
+                                            </div>
+
+                                            <div className="recipe-desc2">
+                                                {ingredient.description ||
+                                                    "No description added yet."}
+                                            </div>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    <footer className="footer">
+                        <div className="footer-inner">
+                            <span>
+                                Â© {new Date().getFullYear()} Recipe Meal Planner
+                            </span>
+                            <span className="muted"></span>
+                        </div>
+                    </footer>
+                </main>
             </div>
         );
     }
@@ -310,6 +554,80 @@ function App() {
     return (
         <div className="app-shell">
             <TopBar route={route} session={session} onLogout={handleLogout} />
+            <header className="topbar">
+                <div className="brand">
+                    <div className="brand-mark" aria-hidden="true">
+                        🍳
+                    </div>
+                    <div className="brand-text">
+                        <div className="brand-name">Recipe Meal Planner</div>
+                        <div className="brand-sub">
+                            Find recipes • Save favorites • Plan your week
+                        </div>
+                    </div>
+                </div>
+
+                <nav className="topnav">
+                    <button
+                        className="nav-link"
+                        type="button"
+                        onClick={() => (window.location.hash = "#/")}
+                    >
+                        Browse
+                    </button>
+                    <button
+                        className="nav-link"
+                        type="button"
+                        onClick={() => (window.location.hash = "#/ingredients")}
+                    >
+                        Ingredients
+                    </button>
+                    <button
+                        className="nav-link"
+                        type="button"
+                        title="Coming soon"
+                    >
+                        Meal Plans
+                    </button>
+                </nav>
+                <div className="auth">
+                    {session ? (
+                        <>
+                            <span className="muted" style={{ fontSize: 13 }}>
+                                {session.user.email}
+                            </span>
+                            <button
+                                className="btn btn-ghost"
+                                type="button"
+                                onClick={handleLogout}
+                            >
+                                Log out
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                className="btn btn-ghost"
+                                type="button"
+                                onClick={() =>
+                                    (window.location.hash = "#/login")
+                                }
+                            >
+                                Log in
+                            </button>
+                            <button
+                                className="btn btn-primary"
+                                type="button"
+                                onClick={() =>
+                                    (window.location.hash = "#/login")
+                                }
+                            >
+                                Sign up
+                            </button>
+                        </>
+                    )}
+                </div>
+            </header>
 
             <main className="page">
                 <section className="hero">
