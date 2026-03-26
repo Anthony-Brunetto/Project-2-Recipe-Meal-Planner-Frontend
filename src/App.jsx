@@ -2,13 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import LoginPage from "./LoginPage";
 import { useAuth } from "./AuthContext";
 import { supabase } from "./lib/supabaseClient";
-
-function getApiBaseUrl() {
-    return (
-        import.meta.env.VITE_API_BASE_URL ||
-        "https://recipe-backend-production-2e13.up.railway.app"
-    );
-}
+import { apiFetch } from "./api";
 
 function sampleRandomItems(items, count) {
     const copied = [...items];
@@ -69,17 +63,8 @@ function App() {
             setFeaturedError("");
             setFeaturedLoading(true);
             try {
-                const response = await fetch(`${getApiBaseUrl()}/api/recipes`);
-                if (!response.ok) {
-                    throw new Error(
-                        `Failed to load featured recipes (${response.status})`,
-                    );
-                }
+                const list = await apiFetch("/api/recipes");
 
-                const payload = await response.json();
-                const list = Array.isArray(payload)
-                    ? payload
-                    : payload?.content;
                 if (!Array.isArray(list)) {
                     throw new Error("Recipes response did not return a list.");
                 }
@@ -95,9 +80,18 @@ function App() {
                 console.error(err);
                 if (!cancelled) {
                     setFeatured([]);
-                    setFeaturedError(
-                        "Could not load featured recipes from backend yet.",
-                    );
+                    if (
+                        err.message.includes("Unauthorized") ||
+                        err.message.includes("Not authenticated")
+                    ) {
+                        setFeaturedError(
+                            "Please log in to view featured recipes.",
+                        );
+                    } else {
+                        setFeaturedError(
+                            "Could not load featured recipes from backend yet.",
+                        );
+                    }
                 }
             } finally {
                 if (!cancelled) {
@@ -132,26 +126,21 @@ function App() {
 
     const loadRecipes = async () => {
         setError("");
-        if (!supabase) {
-            setError(
-                "Supabase is not configured yet. Make sure your .env has VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart.",
-            );
-            return;
-        }
-
         setLoading(true);
         try {
-            // Match your schema: recipe_id, user_id, name, description, instructions
-            const { data, error } = await supabase
-                .from("Recipes")
-                .select("recipe_id, user_id, name, description, instructions")
-                .limit(20);
-
-            if (error) throw error;
+            const data = await apiFetch("/api/recipes");
             setRecipes(data ?? []);
         } catch (err) {
             console.error(err);
-            setError("Could not load recipes from Supabase yet.");
+            if (
+                err.message.includes("Unauthorized") ||
+                err.message.includes("Not authenticated")
+            ) {
+                setError("Please log in to load recipes.");
+                window.location.hash = "#/login";
+            } else {
+                setError("Could not load recipes from backend.");
+            }
             setRecipes([]);
         } finally {
             setLoading(false);
